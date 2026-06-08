@@ -19,9 +19,12 @@ model = ChatGroq(model="llama-3.1-8b-instant")
 
 def chat_node(state: Chatstate):
     # Pass the entire conversation history to the model, not just the last message
-    response = model.invoke(state["message"])
+    # Use stream to get streaming response
+    full_response = ""
+    for chunk in model.stream(state["message"]):
+        full_response += chunk.content
     # add to the state and return as AIMessage
-    return {"message": [AIMessage(content=response.content)]}
+    return {"message": [AIMessage(content=full_response)]}
 
 checkpointer = MemorySaver()
 graph = StateGraph(Chatstate)
@@ -30,5 +33,13 @@ graph.add_edge(START, "chat_node")
 graph.add_edge("chat_node", END)
 chat = graph.compile(checkpointer=checkpointer)
 
-if __name__ == "__main__":
-    thread_id = '1'
+config = {
+    "configurable": {
+        "thread_id": "1"
+    }
+}
+res=chat.invoke(
+    {"message": [HumanMessage(content="Tell me receipe of pasta?")]},
+    config=config
+)
+print()
